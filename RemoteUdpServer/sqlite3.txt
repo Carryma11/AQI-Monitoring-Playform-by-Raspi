@@ -1,0 +1,17 @@
+l Connection.row_factory
+
+你可以将此属性改变为一个callable，此callabel按tuple类型接收原始的row数据，然后返回你想要的结果集。使用此方法，你可以实现许多返回结果集的高级方法，如可以返回一个对象用来按列名存取列数据。
+
+import sqlite3
+def dict_factory(cursor, row):
+    d = {}
+    for idx, col in enumerate(cursor.description):
+        d[col[0]] = row[idx]
+    return d
+ 
+con = sqlite3.connect(":memory:")
+con.row_factory = dict_factory
+cur = con.cursor()
+cur.execute("select 1 as a")
+print cur.fetchone()["a"
+如果返回一个tuple还不够，你还想通过列名访问列数据，你可考虑设置row_factory使用调试优化的sqlite3.Row类型。Row提供了按列索引或列名（大小写敏感）访问数据的能力，且几乎不需要额外的内存开销。大部分情况下，使用Row会比自定义基于字典的方法甚至于使用db_row的方法要好得多。

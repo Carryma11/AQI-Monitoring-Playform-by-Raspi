@@ -1,0 +1,132 @@
+*******************************************************************
+程序名：单片机与MAX485通信子程序
+
+
+运行单片机：51单片机，其他类型单片机可以从此基础上进行修改
+感谢您对小店的支持，祝您和您的家人生活安康，万事如意
+*******************************************************************/
+
+#include<stdio.h> 
+#include<reg52.h> 
+#include<intrins.h> 
+//unsigned int len; 
+//unsigned char rxdbuf[len]; 
+//unsigned char txdbuf[len]; 	不能在定义数组时使用变量
+
+#define LEN 8 	//可以在这里加个宏，然后将数组长度设为该宏 
+unsigned int len; 
+unsigned char rxdbuf[LEN]; 
+unsigned char txdbuf[LEN]; 
+
+
+
+/* 函数预定义 */ 
+void initial(); //串口初始化函数
+void received(unsigned char *rxdbuf,unsigned char len); //接收数据函数
+void sendd(unsigned char *txdbuf, unsigned char len); //发送数据函数
+void sendbyte(unsigned char kk); //发送单字节
+unsigned char receivebyte(); //接收单字节
+
+main() 
+{ 
+unsigned char re; 
+initial(); /*串口初始化*/ 
+while (1) 
+{ 
+/*此处数据可以分别写在发送端与接收端，就可以实现主从控制了，原理相同*/
+re=receivebyte(); /*接收命令信息*/ 
+if(re==0x32) /*命令字0x32表示请求发送*/ 
+sendd(txdbuf,len); 
+elseif(re==0x22) /*命令字0x22表示请求接收*/ 
+received(rxdbuf,len); 
+else 
+sendbyte(0xff); /*发送错误信息“0xff”*/ 
+} 
+}
+/*************************串口初始化子程序 ******************************/ 
+/******如果使用主从模式可以在设置通信方式的时候主设备选择可发送，但不接受。从设备选择只接受不发送，从而避免数据竞争问题*********/
+void initial() 
+{ 
+TMOD=0x20; /*定时器定义*/ 
+TH1=0xfd; /*波特率9600bps*/ 
+TL1=0xfd; 
+SCON=0xd0; /*串口通信采用方式3*/ 
+PCON=0x80; 
+TR1=1; 
+} 
+
+/****************************接收数据函数******************************/ 
+void received(unsigned char *rxdbuf,int len) 
+/*接收数据函数，参数定义：其中rxdbuf存放数据起始地址，len为接收数据个数*/ 
+{ 
+unsigned char a=0x00; 
+unsigned char j; 
+
+for(j=0;j<len;j++) 
+{ 
+while(RI==0); 
+RI=0; 
+rxdbuf[j]=SBUF; 
+a=a+rxdbuf[j]; 
+} 
+while (RI==0) 
+RI=0; 
+rxdbuf [len]=SBUF; 
+if((SBUF＾a)==0) /*比较校验和*/ 
+{ 
+SBUF=0x00; /*校验正确发送“0x00”*/ 
+While(TI==0) 
+TI=0; 
+break; 
+} 
+else 
+{ 
+SBUF=0xff; /*校验错误发送“0xff”*/ 
+While(TI==0) 
+TI=0; 
+} 
+} 
+
+/******************************发送数据函数******************************/ 
+void sendd(unsigned char *txdbuf,int len) 
+/*发送数据函数，参数：txdbuf发送数据起始地址，len发送数据个数*/ 
+{ 
+unsigned char a=0x00; 
+unsigned char j; 
+do{ 
+ 
+SBUF=0x32; 
+while(TI!=1); 
+TI=0; 
+for(j=0;j<len;j++) 
+{ 
+SBUF=txdbuf[j]; 
+a=a+txdbuf[j]; 
+while(TI==0); 
+TI=0; 
+} 
+SBUF=a; 
+while(TI!=1) 
+TI=0; 
+while(RI!=1) 
+RI=0; 
+}While(SBUF!=0x00); /*对方接收有错则重新联络发送数据*/ 
+} 
+
+/*****************************发送单字节函数*****************************/ 
+void sendbyte(unsigned char kk) /*发送单字节，参数定义：kk待发送的数据*/ 
+{ 
+
+SBUF=kk; 
+while(TI==0) 
+TI=0; 
+} 
+
+/*****************************接收单字节函数*****************************/ 
+unsigned char receivebyte() /*接收单字节，返回接收值*/ 
+{ 
+
+while(RI==0) 
+RI=0; 
+return(SBUF); 
+} 
